@@ -16,6 +16,7 @@ C     Function declarations:
       integer mxIsNumeric
       mwPointer mxGetM, mxGetN
       integer*4 mexPrintf
+      integer*4 mxGetString
       
 C     Local Variables      
       mwPointer in_ptr, alt_ptr, D_ptr, T_ptr
@@ -33,16 +34,45 @@ C     Array information:
       real*8 SW(25)
 
       INTEGER i
+      logical OK
+
+      mwSize  maxbuf
+      parameter(maxbuf = 1000)
+      character*1000 input_buf
+      mwPointer strlen
 
       dsize = 10
       tsize = 2
       
-      if(nrhs .ne. 7) then
+      if(nrhs .ne. 8) then
          call mexErrMsgIdAndTxt ('MATLAB:NRLMSISE2_1:nInput',
      &  'Incorrect number of input arguments.')
       elseif(nlhs .ne. 2) then
          call mexErrMsgIdAndTxt ('MATLAB:NRLMSISE2_1:nOutput',
      &  'Incorrect number of output arguments.')
+      endif
+      
+c     parameter path
+C     Get the length of the input string.
+      strlen = mxGetM(prhs(8))*mxGetN(prhs(8))
+      if (strlen .gt. maxbuf) then
+         call mexErrMsgIdAndTxt ('MATLAB:NRLMSISE2_1:maxbuf',
+     +       'Max parameter path length 1000.')
+      endif
+
+C     Get the string contents (dereference the input pointer).
+      status = mxGetString(prhs(8), input_buf, maxbuf)
+
+C     Check if mxGetString is successful.
+      if (status .ne. 0) then 
+         call mexErrMsgIdAndTxt ('MATLAB:NRLMSISE2_1:readError',
+     +             'Error reading parameter path.')
+      endif
+      
+      inquire( file=trim(input_buf)//'msis21.parm', exist=OK)
+      if (.not.OK) then
+        call mexErrMsgIdAndTxt('MATLAB:NRLMSISE2_1:parm',
+     +  trim(input_buf)//'msis21.parm does not exist.')
       endif
       
 c     DAY       Day of year (1.0 to 365.0 or 366.0)
@@ -131,7 +161,8 @@ c     SW
       endif
       
       
-      call msisinit(switch_legacy=sngl(SW))
+      call msisinit(switch_legacy=sngl(SW), 
+     & parmpath=trim(input_buf))
             
 c     get inputs
       in_ptr = mxGetPr(prhs(7))
